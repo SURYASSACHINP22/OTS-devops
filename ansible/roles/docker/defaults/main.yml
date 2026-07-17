@@ -1,0 +1,7 @@
+---
+docker_network_name: ots-network
+docker_volumes:
+  - sqlite_data
+docker_volumes_removed:
+  - postgres_data
+  - redis_data

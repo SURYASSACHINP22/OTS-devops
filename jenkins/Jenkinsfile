@@ -1,0 +1,126 @@
+// Template pipeline for the OTS Django app.
+// TODO markers below need real values once the app repo location and
+// registry/deploy target are decided -- this is scaffolding, not yet
+// wired into a live Jenkins job.
+pipeline {
+    agent any
+
+    environment {
+        // TODO: point at the real ONline_testing_app_django repo
+        APP_REPO_URL = 'https://github.com/<org>/ONline_testing_app_django.git'
+        APP_BRANCH   = 'main'
+        IMAGE_NAME   = 'ots-django-app'
+        IMAGE_TAG    = "${env.BUILD_NUMBER}"
+    }
+
+    options {
+        disableConcurrentBuilds()
+        timestamps()
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: env.APP_BRANCH, url: env.APP_REPO_URL
+            }
+        }
+
+        stage('Install dependencies') {
+            steps {
+                sh '''
+                    python3 -m venv .venv
+                    . .venv/bin/activate
+                    pip install --upgrade pip
+                    pip install -r requirements.txt
+                '''
+            }
+        }
+
+        stage('Run Django unit tests') {
+            steps {
+                sh '''
+                    . .venv/bin/activate
+                    python manage.py test
+                '''
+            }
+        }
+
+        stage('Lint') {
+            steps {
+                sh '''
+                    . .venv/bin/activate
+                    pip install flake8
+                    flake8 .
+                '''
+            }
+        }
+
+        stage('Security scans') {
+            parallel {
+                stage('Bandit (Python SAST)') {
+                    steps {
+                        sh '''
+                            . .venv/bin/activate
+                            pip install bandit
+                            bandit -r . -x .venv
+                        '''
+                    }
+                }
+                stage('Gitleaks (secret scan)') {
+                    steps {
+                        sh 'gitleaks detect --source . --no-git -v'
+                    }
+                }
+                // TODO: add SonarQube stage once a SonarQube server is provisioned
+            }
+        }
+
+        stage('Build Docker image') {
+            steps {
+                sh 'docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .'
+            }
+        }
+
+        stage('Trivy image scan') {
+            steps {
+                sh 'trivy image --exit-code 1 --severity HIGH,CRITICAL ${IMAGE_NAME}:${IMAGE_TAG}'
+            }
+        }
+
+        stage('Run container tests') {
+            steps {
+                // TODO: smoke-test the built container (e.g. hit /healthz) before pushing
+                sh 'echo "TODO: container smoke tests"'
+            }
+        }
+
+        stage('Push image to registry') {
+            steps {
+                // TODO: docker login + push once a registry (ECR/Docker Hub) is chosen
+                sh 'echo "TODO: push ${IMAGE_NAME}:${IMAGE_TAG} to registry"'
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                // TODO: replace with `helm upgrade` once the EKS cluster exists.
+                // Until then this can target docker compose on the existing EC2 host.
+                sh 'echo "TODO: deploy ${IMAGE_NAME}:${IMAGE_TAG}"'
+            }
+        }
+
+        stage('Health check') {
+            steps {
+                // TODO: curl the app's health endpoint and fail the build if unhealthy
+                sh 'echo "TODO: health check"'
+            }
+        }
+    }
+
+    post {
+        failure {
+            // TODO: automatic rollback to the previous known-good image/release
+            echo 'Build failed -- TODO: trigger rollback'
+        }
+    }
+}

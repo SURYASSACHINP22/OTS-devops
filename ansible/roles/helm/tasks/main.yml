@@ -1,0 +1,43 @@
+---
+- name: Install prerequisite packages
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+    state: present
+  become: true
+
+- name: Create apt keyrings directory
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+  become: true
+
+- name: Download Helm apt GPG key (ascii-armored)
+  get_url:
+    url: https://baltocdn.com/helm/signing.asc
+    dest: /tmp/helm.asc
+    mode: "0644"
+    force: true
+  become: true
+
+- name: Dearmor Helm GPG key into binary keyring
+  command: gpg --batch --yes --dearmor -o /etc/apt/keyrings/helm.gpg /tmp/helm.asc
+  become: true
+
+- name: Add Helm apt repository
+  apt_repository:
+    repo: "deb [arch={{ 'amd64' if ansible_architecture == 'x86_64' else ansible_architecture }} signed-by=/etc/apt/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main"
+    state: present
+    filename: helm-stable-debian
+    update_cache: true
+  become: true
+
+- name: Install Helm
+  apt:
+    name: helm
+    state: present
+  become: true

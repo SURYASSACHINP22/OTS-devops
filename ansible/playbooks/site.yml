@@ -1,0 +1,11 @@
+---
+- name: Configure OTS DevOps server
+  hosts: ots_devops
+  gather_facts: true
+
+  roles:
+    - docker
+    - jenkins
+    - k3s
+    - helm
+    - monitoring

@@ -1,0 +1,84 @@
+---
+- name: Create monitoring working directory
+  file:
+    path: /home/ubuntu/monitoring
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: "0755"
+  become: true
+
+- name: Copy Helm values and Loki datasource manifest
+  copy:
+    src: "{{ item }}"
+    dest: "/home/ubuntu/monitoring/{{ item }}"
+    owner: ubuntu
+    group: ubuntu
+    mode: "0644"
+  loop:
+    - kube-prometheus-stack-values.yml
+    - loki-stack-values.yml
+    - loki-datasource.yml
+
+- name: Add prometheus-community Helm repo
+  command: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  register: helm_repo_prom
+  changed_when: "'has been added' in helm_repo_prom.stdout"
+
+- name: Add grafana Helm repo
+  command: helm repo add grafana https://grafana.github.io/helm-charts
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  register: helm_repo_grafana
+  changed_when: "'has been added' in helm_repo_grafana.stdout"
+
+- name: Update Helm repos
+  command: helm repo update
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  changed_when: true
+
+- name: Deploy kube-prometheus-stack (Prometheus + Grafana)
+  command: >
+    helm upgrade --install kube-prometheus-stack
+    prometheus-community/kube-prometheus-stack
+    --namespace monitoring --create-namespace
+    --values /home/ubuntu/monitoring/kube-prometheus-stack-values.yml
+    --wait --timeout 10m
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  changed_when: true
+
+- name: Deploy Loki + Promtail
+  command: >
+    helm upgrade --install loki
+    grafana/loki-stack
+    --namespace monitoring
+    --values /home/ubuntu/monitoring/loki-stack-values.yml
+    --wait --timeout 10m
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  changed_when: true
+
+- name: Register Loki as a Grafana datasource
+  command: kubectl apply -f /home/ubuntu/monitoring/loki-datasource.yml
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  register: loki_datasource_apply
+  changed_when: "'unchanged' not in loki_datasource_apply.stdout"
+
+- name: Read Grafana admin password from its Secret
+  command: kubectl get secret -n monitoring kube-prometheus-stack-grafana -o jsonpath="{.data.admin-password}"
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  register: grafana_admin_password_b64
+  changed_when: false
+
+- name: Fetch Grafana admin password to control node
+  copy:
+    content: "{{ grafana_admin_password_b64.stdout | b64decode }}"
+    dest: "{{ playbook_dir }}/../grafana_admin_password.txt"
+  delegate_to: localhost
+  become: false

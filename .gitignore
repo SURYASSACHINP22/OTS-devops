@@ -26,3 +26,8 @@ __pycache__/
 
 # Logs
 *.log
+
+# Ansible secrets
+ansible/jenkins_initial_admin_password.txt
+ansible/grafana_admin_password.txt
+*.retry

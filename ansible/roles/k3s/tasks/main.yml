@@ -1,0 +1,49 @@
+---
+- name: Check if k3s is already installed
+  stat:
+    path: /usr/local/bin/k3s
+  register: k3s_binary
+
+- name: Install k3s (single-node, Traefik/servicelb disabled to save RAM)
+  shell: >
+    curl -sfL https://get.k3s.io |
+    INSTALL_K3S_EXEC="server --disable traefik --disable servicelb --write-kubeconfig-mode 644" sh -
+  become: true
+  when: not k3s_binary.stat.exists
+
+- name: Wait for k3s node to report Ready
+  command: k3s kubectl get nodes --no-headers
+  register: k3s_node_status
+  become: true
+  retries: 20
+  delay: 6
+  until: k3s_node_status.stdout is defined and 'Ready' in k3s_node_status.stdout
+  changed_when: false
+
+- name: Create .kube directory for ubuntu user
+  file:
+    path: /home/ubuntu/.kube
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: "0700"
+  become: true
+
+- name: Copy k3s kubeconfig for ubuntu user
+  copy:
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: /home/ubuntu/.kube/config
+    owner: ubuntu
+    group: ubuntu
+    mode: "0600"
+    remote_src: true
+  become: true
+
+- name: Ensure KUBECONFIG is set in ubuntu's shell profile
+  lineinfile:
+    path: /home/ubuntu/.bashrc
+    line: "export KUBECONFIG=/home/ubuntu/.kube/config"
+    create: true
+    owner: ubuntu
+    group: ubuntu
+  become: true

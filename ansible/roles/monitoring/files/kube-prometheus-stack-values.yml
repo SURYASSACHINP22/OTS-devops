@@ -1,0 +1,57 @@
+# Trimmed for a 2GB-RAM single-node k3s box shared with Jenkins + Docker.
+alertmanager:
+  enabled: false
+
+grafana:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  persistence:
+    enabled: false
+  sidecar:
+    dashboards:
+      enabled: true
+    datasources:
+      enabled: true
+
+prometheus:
+  prometheusSpec:
+    retention: 6h
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    storageSpec: {}
+
+prometheusOperator:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+kubeStateMetrics:
+  enabled: true
+
+nodeExporter:
+  enabled: true
+
+# These targets don't apply cleanly to a k3s single-node install and just
+# generate permanently-"down" noise.
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeProxy:
+  enabled: false

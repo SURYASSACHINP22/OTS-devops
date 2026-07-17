@@ -1,0 +1,80 @@
+---
+- name: Install OpenJDK 21 (required by current Jenkins)
+  apt:
+    name: openjdk-21-jre-headless
+    state: present
+    update_cache: true
+  become: true
+
+- name: Create apt keyrings directory
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+  become: true
+
+- name: Download Jenkins apt GPG key (ascii-armored)
+  # Jenkins rotates this key periodically (was jenkins.io-2023.key, now
+  # jenkins.io-2026.key per https://www.jenkins.io/doc/book/installing/linux/)
+  get_url:
+    url: https://pkg.jenkins.io/debian-stable/jenkins.io-2026.key
+    dest: /tmp/jenkins.asc
+    mode: "0644"
+    force: true
+  become: true
+
+- name: Dearmor Jenkins GPG key into binary keyring
+  # Ubuntu 24.04's GnuPG (2.4.x) can fail to validate the raw ASCII-armored
+  # key via apt's signed-by, producing NO_PUBKEY even though the file is
+  # present. Dearmoring to a binary keyring avoids that.
+  command: gpg --batch --yes --dearmor -o /etc/apt/keyrings/jenkins.gpg /tmp/jenkins.asc
+  become: true
+
+- name: Add Jenkins apt repository
+  apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/jenkins.gpg] https://pkg.jenkins.io/debian-stable binary/"
+    state: present
+    filename: jenkins
+    update_cache: true
+  become: true
+
+- name: Install Jenkins
+  apt:
+    name: jenkins
+    state: present
+    update_cache: true
+  become: true
+
+- name: Ensure Jenkins service is enabled and running
+  systemd:
+    name: jenkins
+    enabled: true
+    state: started
+  become: true
+
+- name: Add jenkins user to docker group (so pipeline can build/run containers)
+  user:
+    name: jenkins
+    groups: docker
+    append: true
+  become: true
+  notify: restart jenkins
+
+- name: Wait for Jenkins initial admin password file to appear
+  wait_for:
+    path: /var/lib/jenkins/secrets/initialAdminPassword
+    timeout: 120
+  become: true
+
+- name: Read Jenkins initial admin password
+  slurp:
+    src: /var/lib/jenkins/secrets/initialAdminPassword
+  register: jenkins_admin_password_b64
+  become: true
+
+- name: Fetch initial admin password to control node
+  copy:
+    content: "{{ jenkins_admin_password_b64.content | b64decode }}"
+    dest: "{{ playbook_dir }}/../jenkins_initial_admin_password.txt"
+  delegate_to: localhost
+  become: false
