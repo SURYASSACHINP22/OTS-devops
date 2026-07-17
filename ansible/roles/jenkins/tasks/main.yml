@@ -60,6 +60,92 @@
   become: true
   notify: restart jenkins
 
+- name: Install Python build tools for pipeline stages (venv, pip)
+  apt:
+    name:
+      - python3-venv
+      - python3-pip
+    state: present
+  become: true
+
+- name: Check if gitleaks is already installed
+  stat:
+    path: /usr/local/bin/gitleaks
+  register: gitleaks_binary
+
+- name: Download and install gitleaks
+  unarchive:
+    src: "https://github.com/gitleaks/gitleaks/releases/download/v{{ gitleaks_version }}/gitleaks_{{ gitleaks_version }}_linux_x64.tar.gz"
+    dest: /usr/local/bin
+    remote_src: true
+    include: gitleaks
+    mode: "0755"
+  become: true
+  when: not gitleaks_binary.stat.exists
+
+- name: Install prerequisites for Trivy apt repo
+  apt:
+    name:
+      - gnupg
+      - lsb-release
+    state: present
+  become: true
+
+- name: Download Trivy apt GPG key (ascii-armored)
+  get_url:
+    url: https://aquasecurity.github.io/trivy-repo/deb/public.key
+    dest: /tmp/trivy.asc
+    mode: "0644"
+    force: true
+  become: true
+
+- name: Dearmor Trivy GPG key into binary keyring
+  command: gpg --batch --yes --dearmor -o /etc/apt/keyrings/trivy.gpg /tmp/trivy.asc
+  become: true
+
+- name: Add Trivy apt repository
+  apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb {{ ansible_distribution_release }} main"
+    state: present
+    filename: trivy
+    update_cache: true
+  become: true
+
+- name: Install Trivy
+  apt:
+    name: trivy
+    state: present
+  become: true
+
+- name: Create .ssh directory for jenkins user
+  file:
+    path: /var/lib/jenkins/.ssh
+    state: directory
+    owner: jenkins
+    group: jenkins
+    mode: "0700"
+  become: true
+
+- name: Pre-trust GitHub's host key for the jenkins user
+  # Jenkins runs as its own system user, separate from ubuntu -- it has its
+  # own known_hosts and needs github.com trusted before it can git clone
+  # over SSH, otherwise pipeline checkouts fail with "Host key verification
+  # failed." (jenkins is a nologin system user, so this is done as root
+  # writing directly into its .ssh dir rather than via become_user.)
+  known_hosts:
+    name: github.com
+    key: "{{ lookup('pipe', 'ssh-keyscan -t ed25519 github.com') }}"
+    path: /var/lib/jenkins/.ssh/known_hosts
+  become: true
+
+- name: Ensure jenkins .ssh contents are owned by jenkins
+  file:
+    path: /var/lib/jenkins/.ssh
+    owner: jenkins
+    group: jenkins
+    recurse: true
+  become: true
+
 - name: Wait for Jenkins initial admin password file to appear
   wait_for:
     path: /var/lib/jenkins/secrets/initialAdminPassword

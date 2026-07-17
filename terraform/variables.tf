@@ -51,5 +51,5 @@ variable "root_volume_size" {
 variable "jenkins_admin_cidr" {
   description = "CIDR allowed to reach the Jenkins UI (port 8080). Defaults to the operator's current public IP -- update if it changes (e.g. dynamic home/mobile ISP)."
   type        = string
-  default     = "152.59.7.5/32"
+  default     = "47.11.42.250/32"
 }
