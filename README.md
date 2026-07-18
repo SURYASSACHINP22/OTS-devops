@@ -9,6 +9,8 @@ Infrastructure-as-code and CI/CD for the **Online Testing System (OTS)** — a D
 
 Why split: app code changes constantly, infra changes rarely — keeping them separate means CI/CD and Terraform state never get tangled up with day-to-day app commits.
 
+> **New to this project, or coming back after a break?** [`docs/`](docs/README.md) has one file per tool (Terraform, Ansible, Docker, Kubernetes, Helm, Jenkins, Ingress/TLS, Monitoring, Security scanning) explaining what it is, why we chose it, what we actually configured, and the real bugs we hit along the way. This README stays focused on quick reference; `docs/` is where the actual learning happens.
+
 ---
 
 ## Architecture at a glance
