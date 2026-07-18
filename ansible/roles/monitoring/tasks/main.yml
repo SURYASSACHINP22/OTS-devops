@@ -69,6 +69,33 @@
   register: loki_datasource_apply
   changed_when: "'unchanged' not in loki_datasource_apply.stdout"
 
+- name: Download Node Exporter Full dashboard (Grafana.com ID 1860)
+  get_url:
+    url: https://grafana.com/api/dashboards/1860/revisions/latest/download
+    dest: /home/ubuntu/monitoring/node-exporter-full-dashboard.json
+    mode: "0644"
+    force: true
+
+- name: Register Node Exporter Full as a Grafana dashboard
+  # kube-prometheus-stack's Grafana sidecar auto-loads any ConfigMap
+  # labeled grafana_dashboard=1 -- build one from the downloaded JSON
+  # rather than embedding a multi-thousand-line dashboard file in this repo.
+  # Plain `kubectl apply` stores a full copy of the object in the
+  # last-applied-configuration annotation for 3-way diffing, which blows
+  # past Kubernetes' 256KB annotation limit for a dashboard this size.
+  # --server-side apply uses field management instead, no such limit.
+  shell: >
+    kubectl create configmap node-exporter-full-dashboard
+    -n monitoring
+    --from-file=node-exporter-full.json=/home/ubuntu/monitoring/node-exporter-full-dashboard.json
+    --dry-run=client -o yaml
+    | kubectl label --local -f - grafana_dashboard=1 -o yaml
+    | kubectl apply --server-side --force-conflicts -f -
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  register: dashboard_apply
+  changed_when: "'configured' in dashboard_apply.stdout or 'created' in dashboard_apply.stdout"
+
 - name: Read Grafana admin password from its Secret
   command: kubectl get secret -n monitoring kube-prometheus-stack-grafana -o jsonpath="{.data.admin-password}"
   environment:

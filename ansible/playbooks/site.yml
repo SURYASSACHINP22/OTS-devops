@@ -8,4 +8,5 @@
     - jenkins
     - k3s
     - helm
+    - ingress
     - monitoring

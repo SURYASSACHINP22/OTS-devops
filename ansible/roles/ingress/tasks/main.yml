@@ -1,0 +1,80 @@
+---
+- name: Add ingress-nginx Helm repo
+  command: helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  register: helm_repo_nginx
+  changed_when: "'has been added' in helm_repo_nginx.stdout"
+
+- name: Add jetstack (cert-manager) Helm repo
+  command: helm repo add jetstack https://charts.jetstack.io
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  register: helm_repo_jetstack
+  changed_when: "'has been added' in helm_repo_jetstack.stdout"
+
+- name: Update Helm repos
+  command: helm repo update
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  changed_when: true
+
+- name: Create ingress working directory
+  file:
+    path: /home/ubuntu/ingress
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: "0755"
+  become: true
+
+- name: Copy ClusterIssuer manifest
+  copy:
+    src: cluster-issuer.yml
+    dest: /home/ubuntu/ingress/cluster-issuer.yml
+    owner: ubuntu
+    group: ubuntu
+    mode: "0644"
+
+- name: Deploy ingress-nginx (bound directly to host ports 80/443, no NodePort)
+  # hostPort lets Let's Encrypt's HTTP-01 challenge reach port 80 directly
+  # (it specifically requires the standard port, not an arbitrary NodePort),
+  # and reuses the SG rules for 80/443 that have been open since the very
+  # first Terraform apply -- no new SG rule needed.
+  command: >
+    helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx
+    --namespace ingress-nginx --create-namespace
+    --set controller.hostPort.enabled=true
+    --set controller.service.type=ClusterIP
+    --set controller.resources.requests.cpu=50m
+    --set controller.resources.requests.memory=90Mi
+    --set controller.resources.limits.cpu=200m
+    --set controller.resources.limits.memory=200Mi
+    --wait --timeout 5m
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  changed_when: true
+
+- name: Deploy cert-manager (CRDs included)
+  command: >
+    helm upgrade --install cert-manager jetstack/cert-manager
+    --namespace cert-manager --create-namespace
+    --set crds.enabled=true
+    --set resources.requests.cpu=10m
+    --set resources.requests.memory=32Mi
+    --set resources.limits.memory=128Mi
+    --set webhook.resources.requests.cpu=10m
+    --set webhook.resources.requests.memory=32Mi
+    --set cainjector.resources.requests.cpu=10m
+    --set cainjector.resources.requests.memory=32Mi
+    --wait --timeout 5m
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  changed_when: true
+
+- name: Apply the Let's Encrypt ClusterIssuer
+  command: kubectl apply -f /home/ubuntu/ingress/cluster-issuer.yml
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  register: cluster_issuer_apply
+  changed_when: "'unchanged' not in cluster_issuer_apply.stdout"
