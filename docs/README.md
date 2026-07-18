@@ -14,5 +14,6 @@ You built this project without much prior DevOps experience — these docs exist
 | 8 | [Ingress & TLS](08-ingress-tls.md) | How your app gets a real domain and a real HTTPS certificate for free |
 | 9 | [Monitoring](09-monitoring.md) | Prometheus/Grafana/Loki — metrics vs. logs, what we're watching |
 | 10 | [Security scanning](10-security-scanning.md) | Bandit/Gitleaks/Trivy — what each one actually catches |
+| 11 | [Command reference](11-command-reference.md) | Every real command used across this project, organized by tool |
 
 Each doc follows the same shape: **what is this tool** (in general) → **why we're using it here** (the actual reasoning, including cost tradeoffs) → **what we configured** (the real files/settings in this project) → **key things that went wrong and what that taught us** (real bugs we hit, not hypothetical ones).

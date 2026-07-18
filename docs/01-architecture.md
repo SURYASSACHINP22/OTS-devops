@@ -25,6 +25,44 @@
 
 Everything — Jenkins, Docker, and the entire Kubernetes cluster — runs on **one single EC2 instance**. That's a deliberate simplification for a learning project: real production setups would spread this across multiple machines, but one machine is enough to genuinely learn every layer of the stack without paying for a fleet of servers.
 
+## How the pieces on that one server actually talk to each other
+
+It looks like "one server," but internally it's several independent processes talking to each other over local sockets and APIs — worth understanding, because it explains *why* several of the bugs we hit happened.
+
+```
+┌─────────────────────────── the EC2 instance ───────────────────────────┐
+│                                                                          │
+│  Jenkins (a Java process)                                              │
+│      │ shells out to the `docker` CLI                                  │
+│      ▼                                                                  │
+│  Docker daemon (/var/run/docker.sock) ── builds/stores images          │
+│                                                                          │
+│  Jenkins also shells out to `kubectl` / `helm`                         │
+│      │ reads ~/.kube/config → talks to https://127.0.0.1:6443          │
+│      ▼                                                                  │
+│  k3s API server ── the "front desk" for the whole cluster.             │
+│  Every kubectl/helm command is really just: "here's the state          │
+│  I want" sent to this API. Nothing talks to Pods directly.             │
+│      │                                                                  │
+│      ▼                                                                  │
+│  k3s's own controllers notice the desired state changed and act:       │
+│   • kubelet starts/stops actual containers, via containerd             │
+│     (k3s bundles its OWN containerd — a separate image store from      │
+│     Docker's, which is exactly why `docker save | k3s ctr images       │
+│     import` is a real, necessary step, not a formality)                │
+│   • kube-proxy configures networking (iptables rules) so a Service's   │
+│     stable IP actually reaches whichever Pod is currently healthy      │
+│                                                                          │
+│  ingress-nginx and cert-manager aren't special/built-in — they're      │
+│  just more Pods, running in their own namespaces, that happen to       │
+│  watch the API server for Ingress/Certificate objects and act on them  │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**Two concrete things this explains, that we actually hit:**
+- Jenkins needed its **own** copy of `~/.kube/config` (separate from the `ubuntu` user's) before it could run `helm upgrade` at all — because "talking to k3s" always goes through that one config file, and Jenkins runs as its own Linux user (see [doc 3](03-ansible.md)).
+- Pods inside the cluster address each other by **Kubernetes DNS names**, not IPs — e.g. our Grafana datasource points at `http://loki.monitoring.svc.cluster.local:3100`, which reads as "the `loki` Service, in the `monitoring` namespace." This works because k3s runs its own internal DNS server (CoreDNS) resolving exactly that naming pattern — it's not a coincidence or a made-up hostname.
+
 ## Why two separate GitHub repos?
 
 - **`OTS-devops`** (infrastructure) — Terraform, Ansible, the Jenkinsfile *reference copy*. Lives on your WSL laptop.
