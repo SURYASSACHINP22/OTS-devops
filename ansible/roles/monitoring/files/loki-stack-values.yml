@@ -24,6 +24,15 @@ promtail:
 
 grafana:
   enabled: false
+  sidecar:
+    datasources:
+      # Even with grafana.enabled: false, this chart still creates its own
+      # Grafana datasource ConfigMap (isDefault: true) by default, which
+      # conflicts with kube-prometheus-stack's own default Prometheus
+      # datasource ("Only one datasource per organization can be marked as
+      # default") and crashes Grafana. We register Loki as a datasource
+      # ourselves (roles/monitoring/files/loki-datasource.yml) instead.
+      enabled: false
 
 prometheus:
   enabled: false

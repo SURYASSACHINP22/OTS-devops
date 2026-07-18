@@ -47,3 +47,34 @@
     owner: ubuntu
     group: ubuntu
   become: true
+
+- name: Create .kube directory for jenkins user
+  file:
+    path: /var/lib/jenkins/.kube
+    state: directory
+    owner: jenkins
+    group: jenkins
+    mode: "0700"
+  become: true
+
+- name: Copy k3s kubeconfig for jenkins user
+  copy:
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: /var/lib/jenkins/.kube/config
+    owner: jenkins
+    group: jenkins
+    mode: "0600"
+    remote_src: true
+  become: true
+
+- name: Allow jenkins passwordless sudo for local image import only
+  # Local-import (docker save | k3s ctr images import) needs root, since
+  # ctr talks to a root-owned containerd socket. Scoped to exactly this
+  # command, not blanket sudo, so a compromised Jenkins job can't do more
+  # than load images into k3s.
+  copy:
+    dest: /etc/sudoers.d/jenkins-k3s-import
+    content: "jenkins ALL=(root) NOPASSWD: /usr/local/bin/k3s ctr images import *\n"
+    mode: "0440"
+    validate: "visudo -cf %s"
+  become: true
