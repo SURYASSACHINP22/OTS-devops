@@ -43,6 +43,19 @@ resource "aws_security_group" "ec2_sg" {
     cidr_blocks = [var.jenkins_admin_cidr]
   }
 
+  ingress {
+    description = "Grafana UI via NodePort (admin only)"
+
+    from_port = 31123
+    to_port   = 31123
+    protocol  = "tcp"
+
+    # Reuses the same operator-IP variable as Jenkins -- this was
+    # previously a manual, untracked SG rule added outside Terraform.
+    # Bringing it into IaC here so it isn't silently lost/drifted.
+    cidr_blocks = [var.jenkins_admin_cidr]
+  }
+
   egress {
     from_port = 0
     to_port   = 0

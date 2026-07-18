@@ -17,6 +17,14 @@ grafana:
       enabled: true
     datasources:
       enabled: true
+  # NodePort (fixed at 31123) so Grafana is reachable directly at
+  # http://<ec2-public-ip>:31123 -- SG-restricted to the operator's IP via
+  # terraform/security_group.tf, same pattern as the Jenkins UI port.
+  # Making this part of the chart config (not a manual `kubectl patch`)
+  # means it survives helm upgrade/uninstall-reinstall cycles.
+  service:
+    type: NodePort
+    nodePort: 31123
 
 prometheus:
   prometheusSpec:
