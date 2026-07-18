@@ -91,6 +91,6 @@
   command: docker volume rm {{ item }}
   loop: "{{ docker_volumes_removed }}"
   register: docker_volume_remove
-  failed_when: docker_volume_remove.rc != 0 and 'No such volume' not in docker_volume_remove.stderr
+  failed_when: docker_volume_remove.rc != 0 and 'no such volume' not in docker_volume_remove.stderr | lower
   changed_when: docker_volume_remove.rc == 0
   become: true

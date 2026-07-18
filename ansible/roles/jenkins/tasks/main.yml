@@ -146,17 +146,22 @@
     recurse: true
   become: true
 
-- name: Wait for Jenkins initial admin password file to appear
+- name: Wait for Jenkins initial admin password file (only present on a fresh install)
+  # Once someone completes the setup wizard, Jenkins deletes this file --
+  # a re-run against an already-configured instance should not fail here.
   wait_for:
     path: /var/lib/jenkins/secrets/initialAdminPassword
-    timeout: 120
+    timeout: 60
   become: true
+  ignore_errors: true
+  register: jenkins_initial_password_wait
 
 - name: Read Jenkins initial admin password
   slurp:
     src: /var/lib/jenkins/secrets/initialAdminPassword
   register: jenkins_admin_password_b64
   become: true
+  when: jenkins_initial_password_wait is succeeded
 
 - name: Fetch initial admin password to control node
   copy:
@@ -164,3 +169,4 @@
     dest: "{{ playbook_dir }}/../jenkins_initial_admin_password.txt"
   delegate_to: localhost
   become: false
+  when: jenkins_initial_password_wait is succeeded

@@ -19,7 +19,7 @@ variable "environment" {
 variable "instance_type" {
   description = "EC2 instance type"
   type        = string
-  default     = "t3.small"
+  default     = "t3.medium"
 }
 
 variable "vpc_cidr" {
@@ -51,5 +51,5 @@ variable "root_volume_size" {
 variable "jenkins_admin_cidr" {
   description = "CIDR allowed to reach the Jenkins UI (port 8080). Defaults to the operator's current public IP -- update if it changes (e.g. dynamic home/mobile ISP)."
   type        = string
-  default     = "47.11.42.250/32"
+  default     = "152.59.7.63/32"
 }

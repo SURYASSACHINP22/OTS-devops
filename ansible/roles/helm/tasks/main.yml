@@ -17,8 +17,10 @@
   become: true
 
 - name: Download Helm apt GPG key (ascii-armored)
+  # Helm's apt repo migrated from baltocdn.com to packages.buildkite.com --
+  # https://helm.sh/docs/intro/install/ has the current source of truth.
   get_url:
-    url: https://baltocdn.com/helm/signing.asc
+    url: https://packages.buildkite.com/helm-linux/helm-debian/gpgkey
     dest: /tmp/helm.asc
     mode: "0644"
     force: true
@@ -30,7 +32,7 @@
 
 - name: Add Helm apt repository
   apt_repository:
-    repo: "deb [arch={{ 'amd64' if ansible_architecture == 'x86_64' else ansible_architecture }} signed-by=/etc/apt/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main"
+    repo: "deb [signed-by=/etc/apt/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main"
     state: present
     filename: helm-stable-debian
     update_cache: true
