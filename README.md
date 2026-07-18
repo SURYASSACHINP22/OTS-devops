@@ -62,15 +62,49 @@ This one script: loads your SSH key into an agent (asks for your passphrase once
 
 ## Access points
 
-| What | URL | Notes |
-|---|---|---|
-| **The app itself** | `https://13.203.126.12.nip.io/` | Real trusted HTTPS (Let's Encrypt). Redirects to `/OTS/`. |
-| **Jenkins** | `http://13.203.126.12:8080/` | SG-restricted to your current IP (`terraform/variables.tf` → `jenkins_admin_cidr`) |
-| **Grafana** | `http://13.203.126.12:31123/` | Same IP restriction. Login `admin` / password in `ansible/grafana_admin_password.txt` (gitignored, not in git) |
-| **SSH to the server** | `ssh -i ~/.ssh/ots-devops ubuntu@13.203.126.12` | |
-| **App repo on the server** | `~/ONline_testing_app_django` (on the EC2 box, not your laptop) | |
+### The application (public, real HTTPS, no VPN/tunnel needed)
 
-If your ISP has rotated your IP since you last worked on this (very common — it's happened repeatedly), Jenkins/Grafana will look "down" until `start-session.sh` fixes the SG rule — this is not a real outage, just a stale firewall allowlist.
+| What | URL |
+|---|---|
+| App home | `https://13.203.126.12.nip.io/` (redirects to `/OTS/`) |
+| Django admin panel | `https://13.203.126.12.nip.io/admin/` |
+| API docs (Swagger UI) | `https://13.203.126.12.nip.io/api/schema/swagger-ui/` |
+| API docs (ReDoc) | `https://13.203.126.12.nip.io/api/schema/redoc/` |
+| Raw OpenAPI schema | `https://13.203.126.12.nip.io/api/schema/` |
+
+### Operator tools (restricted to your current IP via Security Group)
+
+| What | URL | Credentials |
+|---|---|---|
+| Jenkins | `http://13.203.126.12:8080/` | Your own Jenkins account (created during setup) |
+| Grafana | `http://13.203.126.12:31123/` | `admin` / password in `ansible/grafana_admin_password.txt` (gitignored, not in git) |
+
+If your ISP has rotated your IP since you last worked on this (very common — it's happened repeatedly), these two will look "down" until `start-session.sh` fixes the SG rule — not a real outage, just a stale firewall allowlist. The app/admin/API links above are unaffected since they're public.
+
+### Useful Grafana dashboards (Dashboards → Browse, or jump straight in)
+
+| Dashboard | Path |
+|---|---|
+| Node Exporter Full (host CPU/RAM/disk/network) | `/d/rYdddlPWk/node-exporter-full` |
+| Kubernetes / Compute Resources / Cluster | `/d/efa86fd1d0c121a26444b636a3f509a8/kubernetes-compute-resources-cluster` |
+| Kubernetes / Compute Resources / Pod | `/d/6581e46e4e5c7ba40a07646395ef7b23/kubernetes-compute-resources-pod` |
+
+(append the path to `http://13.203.126.12:31123`)
+
+### Git repositories
+
+| Repo | URL |
+|---|---|
+| Infra (this repo) | `https://github.com/SURYASSACHINP22/OTS-devops` |
+| App code | `https://github.com/SURYASSACHINP22/ONline_testing_app_django` |
+
+### Server access
+
+| What | Command |
+|---|---|
+| SSH | `ssh -i ~/.ssh/ots-devops ubuntu@13.203.126.12` |
+| App repo location on the server | `~/ONline_testing_app_django` (only on the EC2 box, not your laptop) |
+| kubectl/helm on the server | `export KUBECONFIG=/home/ubuntu/.kube/config` (already set in `ubuntu`'s `.bashrc`) |
 
 ---
 
